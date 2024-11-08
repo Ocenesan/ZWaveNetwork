@@ -5,7 +5,9 @@ simple ZWaveController
     parameters:
         double frequency @unit(MHz);
         double range @unit(m);
+        double frequencyLow @unit(MHz);
+        double frequencyHigh @unit(MHz);
         @display("i=device/antennatower");
     gates:
-        inout gate[];
+        inout gate[5];
 }
