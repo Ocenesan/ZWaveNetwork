@@ -9,7 +9,9 @@ simple ZWaveNode
         double frequencyLow @unit(MHz);
         double frequencyHigh @unit(MHz);
         string deviceType;
-        @display("i=device/wifilaptop");
+        double alarmTestInterval @unit(s) = default(0s);         
+        double motionDetectionInterval @unit(s) = default(0s);
+        @display("i=block/circle,,green;is=vs");
     gates:
         inout gate[];
 }
