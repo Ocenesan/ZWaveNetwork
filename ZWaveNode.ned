@@ -8,6 +8,7 @@ simple ZWaveNode
         double range @unit(m);
         double frequencyLow @unit(MHz);
         double frequencyHigh @unit(MHz);
+        string deviceType;
         @display("i=device/wifilaptop");
     gates:
         inout gate[];
