@@ -9,9 +9,9 @@ network ZWaveNetwork
         double range @unit(m) = default(30m);  // Approximate range for ZWave
         double playgroundSizeX @unit(m) = default(100m);
         double playgroundSizeY @unit(m) = default(100m);
-        double frequencyLow @unit(MHz) = default(908.1MHz);
+        double frequencyLow @unit(MHz) = default(908.40MHz);
         double frequencyHigh @unit(MHz) = default(908.42MHz);
-        @display("bgb=ZWaveNetwork/src/floorplan.png, $playgroundSizeX, $playgroundSizeY");
+        @display("bgb=src/floorplan.png, $playgroundSizeX, $playgroundSizeY");
     
     submodules:
         controller: ZWaveController {
@@ -23,26 +23,18 @@ network ZWaveNetwork
         }
  
     connections allowunconnected:
-        // First row horizontal connections (nodes 0-4)
+        for i=0..9 {
+            controller.gate++ <--> IdealChannel <--> node[i].gate++;
+        }
+        
         node[0].gate++ <--> IdealChannel <--> node[1].gate++;
         node[1].gate++ <--> IdealChannel <--> node[2].gate++;
         node[2].gate++ <--> IdealChannel <--> node[3].gate++;
         node[3].gate++ <--> IdealChannel <--> node[4].gate++;
-        
-        // Second row horizontal connections (nodes 5-9)
+        node[4].gate++ <--> IdealChannel <--> node[5].gate++;
         node[5].gate++ <--> IdealChannel <--> node[6].gate++;
         node[6].gate++ <--> IdealChannel <--> node[7].gate++;
         node[7].gate++ <--> IdealChannel <--> node[8].gate++;
         node[8].gate++ <--> IdealChannel <--> node[9].gate++;
-        
-        // Vertical connections between rows
-        node[0].gate++ <--> IdealChannel <--> node[5].gate++;
-        node[1].gate++ <--> IdealChannel <--> node[6].gate++;
-        node[2].gate++ <--> IdealChannel <--> node[7].gate++;
-        node[3].gate++ <--> IdealChannel <--> node[8].gate++;
-        node[4].gate++ <--> IdealChannel <--> node[9].gate++;
-        
-        // Controller connections to each row
-        controller.gate++ <--> IdealChannel <--> node[2].gate++; // Connect to middle of first row
-        controller.gate++ <--> IdealChannel <--> node[7].gate++; // Connect to middle of second row
+        node[9].gate++ <--> IdealChannel <--> node[0].gate++;
 }
