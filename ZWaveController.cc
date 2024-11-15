@@ -14,7 +14,6 @@ protected:
     double frequencyHigh;
     int numGates;
     bool sendCommands;
-    int commandNode;
     std::string commandType;
     std::vector<int> connectedNodes;
 
@@ -33,7 +32,6 @@ void ZWaveController::initialize()
     frequencyLow = par("frequencyLow").doubleValue();
     frequencyHigh = par("frequencyHigh").doubleValue();
     sendCommands = par("sendCommands").boolValue();
-    commandNode = par("commandNode").intValue();
     commandType = par("commandType").stdstringValue();
     numGates = gateSize("gate");
 
@@ -45,15 +43,10 @@ void ZWaveController::initialize()
 
     EV << "ZWave Controller initialized with FSK frequencies "
            << frequencyLow << " MHz and " << frequencyHigh << " MHz\n";
-    EV << "Number of connected gates: " << numGates << "\n";
-    EV << "Connected nodes: " << connectedNodes.size() << "\n";
+    EV << "Number of connected nodes: " << connectedNodes.size() << "\n";
 
     if (sendCommands && !connectedNodes.empty()) {
-        scheduleAt(simTime() + 2, new cMessage("sendCommand"));
-    }  else {
-         // Schedule the first message (if not sending commands)
-        cMessage *startMsg = new cMessage("start");
-        scheduleAt(simTime() + uniform(0, 1), startMsg);
+        scheduleAt(simTime() + 2, new cMessage("sendBatchCommand"));
     }
 }
 
@@ -65,35 +58,25 @@ bool ZWaveController::isValidGateIndex(int index) const
 void ZWaveController::handleMessage(cMessage *msg)
 {
     if (msg->isSelfMessage()) {
-        if (strcmp(msg->getName(), "sendCommand") == 0) {  // Handle commands
-            if (commandNode >= 0 && commandNode < connectedNodes.size()) {
-                int gateIndex = connectedNodes[commandNode];
-                sendCommand(gateIndex, commandType);
-                EV << "Controller sent command '" << commandType
-                   << "' to Node " << commandNode << " via gate " << gateIndex << "\n";
+        if (strcmp(msg->getName(), "sendCommand") == 0) {
+            // Iterate over connected nodes and send commands to each based on the node type or sequence
+            for (int i = 0; i < connectedNodes.size(); ++i) {
+                int gateIndex = connectedNodes[i];
+                if (i % 3 == 0) {
+                    sendCommand(gateIndex, "ON");       // Example: Turning on a lamp
+                } else if (i % 3 == 1) {
+                    sendCommand(gateIndex, "RaiseTemp"); // Example: Adjusting a thermostat
+                } else if (i % 3 == 2) {
+                    sendCommand(gateIndex, "UnlockDoor"); // Example: Unlocking a door lock
+                }
             }
-            else {
-                EV << "Invalid commandNode index\n";
-            }
-            scheduleAt(simTime() + 10, msg); // Reschedule command
-        } else { // Handle FSK data messages
+            scheduleAt(simTime() + 10, msg); // Reschedule to send commands periodically
 
+        } else if (strcmp(msg->getName(), "start") == 0) {
+            // Sending FSK data to random nodes
             int numMessagesToSend = 3;
             for (int i = 0; i < numMessagesToSend; i++) {
-                int randomNode;
-                int attempts = 0;
-                int maxAttempts = 5;
-
-                do {
-                    randomNode = intuniform(0, numGates - 1);
-                    attempts++;
-                } while (!isValidGateIndex(randomNode) && attempts < maxAttempts);
-
-                if (attempts >= maxAttempts) {
-                    EV << "Could not find a valid gate after " << maxAttempts << " attempts\n";
-                    continue;
-                }
-
+                int randomNode = intuniform(0, numGates - 1);
                 int bitToSend = intuniform(0, 1);
                 double chosenFrequency = (bitToSend == 0) ? frequencyLow : frequencyHigh;
 
@@ -111,29 +94,14 @@ void ZWaveController::handleMessage(cMessage *msg)
                     delete dataMsg;
                 }
             }
-             cMessage *nextMsg = new cMessage("start"); // Reschedule FSK data
-             scheduleAt(simTime() + exponential(1.0), nextMsg);
+            cMessage *nextMsg = new cMessage("start");
+            scheduleAt(simTime() + exponential(1.0), nextMsg);
         }
 
     } else {
         int arrivalGate = msg->getArrivalGate()->getIndex();
         processIncomingMessage(msg, arrivalGate); // Process incoming messages
         delete msg;
-    }
-}
-
-
-void ZWaveController::sendCommand(int nodeId, const std::string& cmd)
-{
-    if (nodeId >= 0 && nodeId < gateSize("gate")) {
-        cMessage *cmdMsg = new cMessage(cmd.c_str());
-        try {  // Add error handling
-            send(cmdMsg, "gate$o", nodeId);
-            EV << "Controller sending command '" << cmd << "' to Gate " << nodeId << "\n";
-        } catch (cRuntimeError& e) {
-            EV << "Error sending command: " << e.what() << "\n";
-            delete cmdMsg;
-        }
     }
 }
 
@@ -159,6 +127,20 @@ void ZWaveController::processIncomingMessage(cMessage *msg, int nodeId) {
         double receivedFrequency = msg->par("frequency").doubleValue();
         int receivedBit = (receivedFrequency == frequencyLow) ? 0 : 1;
         EV << "Received Frequency: " << receivedFrequency << " MHz, Bit: " << receivedBit << "\n";
+    }
+}
+
+void ZWaveController::sendCommand(int nodeId, const std::string& cmd)
+{
+    if (isValidGateIndex(nodeId)) {
+        cMessage *cmdMsg = new cMessage(cmd.c_str());
+        try {
+            send(cmdMsg, "gate$o", nodeId);
+            EV << "Controller sending command '" << cmd << "' to Gate " << nodeId << "\n";
+        } catch (const cRuntimeError& e) {
+            EV << "Error sending command: " << e.what() << "\n";
+            delete cmdMsg;
+        }
     }
 }
 
